@@ -13,7 +13,8 @@ from functions import page_down
 def get_products_links(item_name:str="наушники беспроводные"):
     '''Собирает ссылки на товару по запросу, переданному аргументом в функцию
     Для пауз используется стандартный time.sleep() потому что пауза селениума уходит в ошибку почему-то
-    правильнее наверное все таки паузу селениума использовать'''
+    правильнее наверное все таки паузу селениума использовать
+    Во внутрь карточек проваливаться придется, так-как информации на общей странице недостаточно.'''
 
     #driver = uc.Chrome()  # инициализация драйвера
 
@@ -43,6 +44,19 @@ def get_products_links(item_name:str="наушники беспроводные"
 
         #page_down(driver=driver)  # вызывает функцию скролинга страницы
         #time.sleep(5)  # ожидание после вызова функции скролинга
+
+        # поиск ссылок на страницы товаров
+        try:
+            find_links = driver.find_elements(By.CLASS_NAME, 'tile-hover-target')
+            result_urls = list(set([f'{link.get_attribute("href")}\n' for link in find_links]))
+            
+            with open("urls.txt", "w", encoding="utf-8") as file:
+                file.writelines(result_urls)
+            
+            print("[+] Ссылки на товары добавлены")
+        except:
+            print("[-] По дороге что-то сломалось.")
+
 
 
 def test():
