@@ -1,3 +1,5 @@
+from typing import Generator
+
 
 def page_down(driver):
     '''JS функция скроллинга страницы '''
@@ -16,3 +18,20 @@ def page_down(driver):
                                 }
                             }, scrollInterval);
                         ''')
+    
+
+def links_generator(find_links: list[str]) -> Generator:
+    '''Функция заполняющая создает генератор ссылок на карточки товара
+    функция избавляется от дублей ссылок и в тоже время сохраняет порядок.
+    за счет того, что добавляет ссылки через одну '''
+    num: int = 0  # счетчик
+
+    # проходит циклом и добавляет ссылки через одну
+    for link in find_links:
+        if num % 2 == 0:
+            yield link
+        num += 1
+
+            
+
+
