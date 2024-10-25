@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from functions import page_down, links_generator
+from functions import page_down, links_generator, searcher_links, select_locatiion
 
 
 def get_products_links(item_name:str="наушники беспроводные"):
@@ -21,11 +21,13 @@ def get_products_links(item_name:str="наушники беспроводные"
         url = "https://ozon.ru"  # url озона
 
         driver.get(url)  # гет на юрл
-        time.sleep(3)  # пауза после гета на юрл
+        time.sleep(2)  # пауза после гета на юрл
 
-        update_input = driver.find_element(By.ID, 'reload-button')  # определение кнопки "Обновить"
-        update_input.send_keys(Keys.ENTER)  # нажатие энтер обновить
+        driver.find_element(By.ID, 'reload-button').click()  # определение кнопки "Обновить" и клик на нее
         time.sleep(2)  # пауза после обновления страницы
+
+        # вызывет функцию выбора предлагаемого местоположения
+        select_locatiion(driver)
         
         find_input = driver.find_element(By.NAME, 'text')  # находит строку поиска
         find_input.clear()  # на всякий, очищает строку
@@ -46,29 +48,42 @@ def get_products_links(item_name:str="наушники беспроводные"
         #time.sleep(5)  # ожидание после вызова функции скролинга
         ### ###
 
-        # поиск ссылок на страницы товаров
-        try:
-            find_links = driver.find_elements(By.CLASS_NAME, 'tile-hover-target') # поиск по тегу
-            print(type(find_links))
+        # поиск ссылок на страницы товаров и запись их в json файл используя ф-ция из functions.py
+        searcher_links(driver)
 
-            '''словарь пронумерованных ссылок. для того чтобы избавиться от дублей ссылок используется 
-            фунция list_generator из functions.py которая просто берет ссылки через одну
-            дубли ссылок появляются из-за ссылок на картинке и на наименовании товара'''
-            result_urls = {
-                j: k for j, k in enumerate(
-                    (f'{link.get_attribute("href")}' for link in links_generator(find_links))
-                )
-            }
-            
-            # запись в файл json, название которого состоит из имени ресурса, даты и времени парсинга
-            with open(
-                f'{datetime.strftime(datetime.now(), "./ozon_links/ozon_links_d%d%m%y_t%H%M%S.json")}', 'w', encoding='utf-8'
-                ) as file:
-                json.dump(result_urls, file, indent=4, ensure_ascii=False)
+        '''Функция собирает информацию о товаре из карточки'''
+        driver.switch_to.new_window('tab')  # открывает новую вкладку
+        time.sleep(2)  # ждет 2 сек
+        driver.get(url)  # гет на юрл карточки товара
+        time.sleep(2)  # снова ждет
 
-            print("[+] Ссылки на товары добавлены")  # сообщение о удачном сборе ссылок карточек
-        except:
-            print("[!] По дороге что-то сломалось.")  # если что-то пошло не так      
+
+
+
+        # находит артикул товара
+        product_id = driver.find_element(
+            By.XPATH, '//div[contains(text(),"Артикул:")]'
+        ).rstrip("Артикул: ")
+
+        print(product_id)  # принтуем артикулы для теста (потом удалить)
+
+        page = str(driver.page_source)  # сохраняет страницу
+        soup = BeautifulSoup(page, 'lxml')  # создает суп
+
+        # находит имя товара
+        product_name = soup.find('div', attrs={'data-widget': 'webProductHeading'}).find(
+            'h1').text.strip().replace('\t', '').replace('\n', ' ')
+        
+        # нахлдит продавца
+        product_seller = soup.find('div', attrs={'class': 'container_c'}).find_all('a')  # находит все теги элементы а
+
+        for i in soup.find('div', attrs={'class': 'container_c'}).find_all('a'):
+            if "title" in i:
+                product_seller = i.text
+                seller_link = i.get("href")    
+
+
+
 
 
 def main() -> None:
