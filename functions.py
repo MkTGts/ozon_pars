@@ -5,6 +5,7 @@ from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from bs4 import BeautifulSoup
 
 
 def page_down(driver: webdriver) -> None:
@@ -94,9 +95,79 @@ def collect_product_info(driver: webdriver, url: str):
 
     print(product_id)  # принтуем артикулы для теста (потом удалить)
 
-            
+
+def product_data_pars(driver: webdriver, url: str):
+    '''Функция открывает карточку товара в новой вкладке собирает информацию о товаре из карточкию.'''
+    driver.switch_to.new_window('tab')  # открывает новую вкладку
+    time.sleep(2)  # ждет 2 сек
+    driver.get(url)  # гет на юрл карточки товара
+    ###
+    time.sleep(2)
+    time.sleep(2)  # пауза после обновления страницы
+    ###
+    time.sleep(2)  # снова ждет
+
+    # находит артикул товара
+    product_id = driver.find_element(
+        By.XPATH, '//div[contains(text(),"Артикул:")]'
+    ).text.lstrip("Артикул: ")
+
+    page = str(driver.page_source)  # сохраняет страницу
+    soup = BeautifulSoup(page, 'lxml')  # создает суп
+
+    # находит имя товара
+    product_name = soup.find('div', attrs={'data-widget': 'webProductHeading'}).find(
+        'h1').text.strip().replace('\t', '').replace('\n', ' ')
+    
+    # находит рейтинг статистику (рейтинг оценка и кол-во отзывов)
+    product_stat = soup.find('div', attrs={"data-widget": 'webSingleProductScore'}).find("div").text.split(' • ')
+    if len(product_stat) > 1:  # если строка разделилась символом • значит есть отзывы
+        product_stars =  product_stat[0]  # рейтинг оценка
+        product_reviews = product_stat[1].rstrip(' отзывов')  # количество отзывов
+    else:  # если нет то ноны
+        product_stars = None
+        product_reviews = None
+
+    # находит цену по озон карте
+    try:
+        product_card_price = soup.find('div', attrs={
+            'data-widget': 'webSale'}).find('span').find('span').text
+    except:
+        product_card_price = None
+
+    # дисконтная цена
+    try:
+        # находит общий тег цен без карты
+        list_tag_prices = soup.find('span', string='без Ozon Карты').parent.parent.find('div').find_all('span')
+        # цена со скидкой
+        product_discount_price = list_tag_prices[0].text
+        # если для списка больше 1 значит есть вторая цена, это полная цена 
+        if len(list_tag_prices) > 1:
+            product_full_price = list_tag_prices[1].text
+    except:
+        # в случае ошибки ноны
+        product_discount_price = None
+        product_full_price = None
+
+    # словарь со всеми собранными данными
+    product_data = {
+        'product_id': product_id,
+        'product_name': product_name,
+        'product_stat': product_stat,
+        'product_stars': product_stars,
+        'product_reviews': product_reviews, 
+        'product_card_price': product_card_price,
+        'product_discount_price': product_discount_price, 
+        'product_full_price': product_full_price
+    }
+
+    return product_data
 
 
+
+with webdriver.Chrome() as driver:
+
+    print(test1(driver=driver, url="https://www.ozon.ru/product/bane-adapter-cable-1-pcs-white-1015905521/?advert=ANwAvZANSMIoerm-5fLBNLmHATZrXrLVHRRPMe0SIDjdNA0h-1RFMu2r3lFLfnGfkyDMLcpp82TTMfikFuaV7mAm0vHmUoR530sLNE4dyWBAf77SyjOYisXeObnEd9DsAKQII10RyngiVrHFzHLWbF-1rLiXwQVNu__9HwvxDeqJrfvhA9VsIwPvYb18Bnd9hAOxkyCG4Ub49Q_kRuye4tmLuEkg47Fneiapa8JPPjFcy-EgqotDXJrxi7WBONWfn0J7ZNu613kgfB7ULH7WhkebH-klaKaKBZ5IC2vP_KJUf1BaehaFxtaGr9Y1AKFjjp09LRUWJAvH8j450lVk1WRxIrPPCWnWPONCC6p6mTQYNdSKqJSmwr0oI4QAvEsJ9gpJgw&avtc=1&avte=2&avts=1729873895&keywords=%D0%BF%D0%B5%D1%80%D0%B5%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA+iphone+aux", ))
             
 
 

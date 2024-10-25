@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from functions import page_down, links_generator, searcher_links, select_locatiion
+from functions import *
 
 
 def get_products_links(item_name:str="наушники беспроводные"):
@@ -51,39 +51,8 @@ def get_products_links(item_name:str="наушники беспроводные"
         # поиск ссылок на страницы товаров и запись их в json файл используя ф-ция из functions.py
         searcher_links(driver)
 
-        '''Функция собирает информацию о товаре из карточки'''
-        driver.switch_to.new_window('tab')  # открывает новую вкладку
-        time.sleep(2)  # ждет 2 сек
-        driver.get(url)  # гет на юрл карточки товара
-        time.sleep(2)  # снова ждет
-
-
-
-
-        # находит артикул товара
-        product_id = driver.find_element(
-            By.XPATH, '//div[contains(text(),"Артикул:")]'
-        ).rstrip("Артикул: ")
-
-        print(product_id)  # принтуем артикулы для теста (потом удалить)
-
-        page = str(driver.page_source)  # сохраняет страницу
-        soup = BeautifulSoup(page, 'lxml')  # создает суп
-
-        # находит имя товара
-        product_name = soup.find('div', attrs={'data-widget': 'webProductHeading'}).find(
-            'h1').text.strip().replace('\t', '').replace('\n', ' ')
-        
-        # нахлдит продавца
-        product_seller = soup.find('div', attrs={'class': 'container_c'}).find_all('a')  # находит все теги элементы а
-
-        for i in soup.find('div', attrs={'class': 'container_c'}).find_all('a'):
-            if "title" in i:
-                product_seller = i.text
-                seller_link = i.get("href")    
-
-
-
+        # ??? не доделано
+        product_data = product_data_pars(driver, url)
 
 
 def main() -> None:
