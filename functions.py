@@ -40,8 +40,8 @@ def links_generator(find_links: list[str]) -> Generator:
         num += 1
 
 
-def searcher_links(driver: webdriver) -> None:
-    '''Функция поиска ссылок на страницы товаров. Находит ссылки и записывает в json файл.
+def searcher_links(driver: webdriver) -> dict[int: str] | None:
+    '''Функция поиска ссылок на страницы товаров. Находит ссылки и записывает в json файл. После возвращает словарь, для прохода по карточкам товара в main.py
     работает. Создает словарь, проходясь по генератору ссылок.'''
     try:
         find_links = driver.find_elements(By.CLASS_NAME, 'tile-hover-target') # поиск по тегу
@@ -63,11 +63,12 @@ def searcher_links(driver: webdriver) -> None:
             json.dump(result_urls, file, indent=4, ensure_ascii=False)
 
         print("[+] Ссылки на товары добавлены")  # сообщение о удачном сборе ссылок карточек
+        return result_urls
     except:
         print("[!] По дороге что-то сломалось.")  # если что-то пошло не так    
 
 
-def select_locatiion(driver: webdriver) -> None:
+def select_locatiion(driver: webdriver) -> dict:
     '''Озон авто определяет местопложение и эта функция клик по кнопке подвердить в сплывающем окне определнному местополжению
     спорная на самом деле реализация, но вроде работает пока, за счет ожидания в если не появилась кнопка'''
     try:
@@ -99,13 +100,9 @@ def collect_product_info(driver: webdriver, url: str):
 def product_data_pars(driver: webdriver, url: str):
     '''Функция открывает карточку товара в новой вкладке собирает информацию о товаре из карточкию.'''
     driver.switch_to.new_window('tab')  # открывает новую вкладку
-    time.sleep(2)  # ждет 2 сек
+    #time.sleep(0.4)  # ждет 
     driver.get(url)  # гет на юрл карточки товара
-    ###
-    time.sleep(2)
-    time.sleep(2)  # пауза после обновления страницы
-    ###
-    time.sleep(2)  # снова ждет
+    #time.sleep(0.4)  # снова ждет
 
     # находит артикул товара
     product_id = driver.find_element(
@@ -161,13 +158,16 @@ def product_data_pars(driver: webdriver, url: str):
         'product_full_price': product_full_price
     }
 
+    driver.close()  # закрывает окно карточки товара    
+    driver.switch_to.window(driver.window_handles[0])  # переходит на дефолтную страницу
+
     return product_data
 
 
 
-with webdriver.Chrome() as driver:
+#with webdriver.Chrome() as driver:
 
-    print(test1(driver=driver, url="https://www.ozon.ru/product/bane-adapter-cable-1-pcs-white-1015905521/?advert=ANwAvZANSMIoerm-5fLBNLmHATZrXrLVHRRPMe0SIDjdNA0h-1RFMu2r3lFLfnGfkyDMLcpp82TTMfikFuaV7mAm0vHmUoR530sLNE4dyWBAf77SyjOYisXeObnEd9DsAKQII10RyngiVrHFzHLWbF-1rLiXwQVNu__9HwvxDeqJrfvhA9VsIwPvYb18Bnd9hAOxkyCG4Ub49Q_kRuye4tmLuEkg47Fneiapa8JPPjFcy-EgqotDXJrxi7WBONWfn0J7ZNu613kgfB7ULH7WhkebH-klaKaKBZ5IC2vP_KJUf1BaehaFxtaGr9Y1AKFjjp09LRUWJAvH8j450lVk1WRxIrPPCWnWPONCC6p6mTQYNdSKqJSmwr0oI4QAvEsJ9gpJgw&avtc=1&avte=2&avts=1729873895&keywords=%D0%BF%D0%B5%D1%80%D0%B5%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA+iphone+aux", ))
+    #print(test1(driver=driver, url="https://www.ozon.ru/product/bane-adapter-cable-1-pcs-white-1015905521/?advert=ANwAvZANSMIoerm-5fLBNLmHATZrXrLVHRRPMe0SIDjdNA0h-1RFMu2r3lFLfnGfkyDMLcpp82TTMfikFuaV7mAm0vHmUoR530sLNE4dyWBAf77SyjOYisXeObnEd9DsAKQII10RyngiVrHFzHLWbF-1rLiXwQVNu__9HwvxDeqJrfvhA9VsIwPvYb18Bnd9hAOxkyCG4Ub49Q_kRuye4tmLuEkg47Fneiapa8JPPjFcy-EgqotDXJrxi7WBONWfn0J7ZNu613kgfB7ULH7WhkebH-klaKaKBZ5IC2vP_KJUf1BaehaFxtaGr9Y1AKFjjp09LRUWJAvH8j450lVk1WRxIrPPCWnWPONCC6p6mTQYNdSKqJSmwr0oI4QAvEsJ9gpJgw&avtc=1&avte=2&avts=1729873895&keywords=%D0%BF%D0%B5%D1%80%D0%B5%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA+iphone+aux", ))
             
 
 

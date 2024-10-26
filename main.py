@@ -48,11 +48,34 @@ def get_products_links(item_name:str="наушники беспроводные"
         #time.sleep(5)  # ожидание после вызова функции скролинга
         ### ###
 
-        # поиск ссылок на страницы товаров и запись их в json файл используя ф-ция из functions.py
-        searcher_links(driver)
+        # поиск ссылок на страницы товаров и запись их в json файл используя и присвоение переменной ф-ция из functions.py
+        #searcher_links(driver)
 
-        # ??? не доделано
-        product_data = product_data_pars(driver, url)
+        time.sleep(2)
+
+        # список под словари с данными по карточкам товаров
+        products_data: list = []
+
+        # проходит циклом по словарю ссылок
+        for n, url in searcher_links(driver).items():
+            try:  # если ошибок нет
+                data: dict = product_data_pars(driver=driver, url=url)  # собирает данные с карточки товара в словарь
+                print(f"[+] С ссылки №{n} данные успешно собраны.")  # принутет что все норм
+                #time.sleep(1)  # ожидание
+                products_data.append(data)  # и запись в общую коллекцию
+            except Exception as err:  # если что-то пошло не так, сообщает об этом
+                print(f'[-] При работе с ссылкой №{n} возникла ошибка {err}.')
+            if n == 3:  # для теста ограничение на проход только по 3-м ссылкам
+                break
+
+        # записывает полученные данные в результурющий json
+        with open(
+            datetime.strftime(datetime.now(), "./ozon_datas/OZON_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
+            ) as file:
+            json.dump(products_data, file, indent=4, ensure_ascii=False)
+
+
+        
 
 
 def main() -> None:
