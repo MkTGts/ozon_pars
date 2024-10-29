@@ -227,3 +227,126 @@ class Ozon():
             datetime.strftime(datetime.now(), "./ozon_datas/OZON_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
             ) as file:
             json.dump(products_data, file, indent=4, ensure_ascii=False)
+
+
+
+# класс парсера wb
+class Wildberries():
+    sign_sorting: dict = {
+            'price_l': '&sort=priceup',  # по возрастанию цены
+            'price_h': '&sort=pricedown',  # по убыванию цены
+            'new': '&sort=newly',  # по новизне
+            'sale': '&sort=benefit',  # по распродажам
+            'rate': '&sort=rate'  # по рейтингу
+        }
+
+
+    def __init__(self, driver: webdriver, item_name: str, sign: str="rate", count_cards=3, timing=2) -> None:
+        self.url = "https://www.wildberries.ru/"  # url wildberries
+        self.driver = driver  # объект дравйвера
+        self.timing = timing  # время ожидания в общем случае
+        self.item_name = item_name  # наименование товара для поискового запроса
+        self.sign = __class__.sign_sorting[sign]  # признак сортировки по которому будет сортировать полученый список товаров
+        self.count_cards = count_cards  # количество проходимых карточек товаров
+
+
+    def page_down(self) -> None:
+        '''JS функция скроллинга страницы '''
+        self.driver.execute_script('''
+                                const scrollStep = 200; // Размер шага прокрутки (в пикселях)
+                                const scrollInterval = 100; // Интервал между шагами (в миллисекундах)
+
+                                const scrollHeight = document.documentElement.scrollHeight;
+                                let currentPosition = 0;
+                                const interval = setInterval(() => {
+                                    window.scrollBy(0, scrollStep);
+                                    currentPosition += scrollStep;
+
+                                    if (currentPosition >= scrollHeight) {
+                                        clearInterval(interval);
+                                    }
+                                }, scrollInterval);
+                            ''')
+
+
+    def go_get(self) -> None:
+        '''Метод гет запроса на главную страницу ВБ'''
+        self.driver.get(self.url)  # гет запрос 
+        time.sleep(self.timing)  # ожидание
+
+
+    def go_search(self) -> None:
+        '''Метод вводит в поисковую строку ВБ нужное наименование товара и начинает поиск.'''
+        find_input = self.driver.find_element(By.ID, 'searchInput')  # находит строку поиска
+        find_input.clear()  # на всякий случай строка для поиска очищается
+        find_input.send_keys(self.item_name)  # вводит в строку поиска наш запрос
+        time.sleep(0.5)  # небольшое ожидание после ввода
+
+        find_input.send_keys(Keys.ENTER)  # жмет энтер
+        time.sleep(self.timing)  # ожидание после начала поиска
+
+
+    def go_sorting(self) -> None:
+        '''Cортировка товаров на странице. Стандартная сортировка по рейтингу.
+        K юрл добавляется запрос сортировка'''
+        current_url = f'{self.driver.current_url}{self.sign}'
+        self.driver.get(current_url)  # гет на юрл страницы отсортированных товаров
+        time.sleep(self.timing)  # ожидаение после сортировки товаров 
+
+
+    def _go_scroll(self) -> None:
+        '''Скролинг страницы. Пока не используется.'''
+        self.page_down(self.driver)  # вызывает функцию скролинга страницы
+        time.sleep(self.timing)  # ожидание после вызова функции скролинга
+
+
+    def searcher_links(self) -> dict[int: str] | None:
+        '''Метод поиска ссылок на страницы товаров. Находит ссылки и записывает в json файл. После возвращает словарь, для прохода по карточкам товара'''
+        #try:
+        time.sleep(3)
+        find_links = self.driver.find_elements(By.TAG_NAME, 'draggable') # поиск по тегу
+        print(find_links)
+
+        '''словарь пронумерованных ссылок. для того чтобы избавиться от дублей ссылок используется 
+            фунция list_generator из functions.py которая просто берет ссылки через одну.
+            вообще дубли ссылок появляются из-за того что ссылка есть на картинке и на наименовании товара
+            result_urls = {
+                j: k for j, k in enumerate(
+                    (f'{link.get_attribute("href")}' for link in self.links_generator(find_links))
+                )
+            }
+            
+            # запись в файл json, название которого состоит из имени ресурса, даты и времени парсинга
+            with open(
+                f'{datetime.strftime(datetime.now(), "./ozon_links/ozon_links_d%d%m%y_t%H%M%S.json")}', 'w', encoding='utf-8'
+                ) as file:
+                json.dump(result_urls, file, indent=4, ensure_ascii=False)
+
+            print("[+] Ссылки на товары добавлены")  # сообщение о удачном сборе ссылок карточек
+            return result_urls
+        except:
+            print("[!] По дороге что-то сломалось.")  # если что-то пошло не так   '''
+
+
+
+    def go_product_datas(self) -> None:
+        products_data: list = []
+
+        # проходит циклом по словарю ссылок
+        for n, url in self.searcher_links().items():
+            try:  # если ошибок нет
+                data: dict = self.product_data_pars(url=url)  # собирает данные с карточки товара в словарь
+                print(f"[+] С ссылки №{n} данные успешно собраны.")  # принутет что все норм
+                products_data.append(data)  # и запись в общую коллекцию
+            except Exception as err:  # если что-то пошло не так, сообщает об этом
+                print(f'[-] При работе с ссылкой №{n} возникла ошибка {err}.')
+            if n == self.count_cards:  # для теста ограничение на проход только по 3-м ссылкам
+                break
+
+                # записывает полученные данные в результурющий json
+        with open(
+            datetime.strftime(datetime.now(), "./ozon_datas/OZON_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
+            ) as file:
+            json.dump(products_data, file, indent=4, ensure_ascii=False)
+
+
