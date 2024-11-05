@@ -49,6 +49,25 @@ class Ozon():
                             ''')
         
 
+    def del_to_not_dig(self, s: str) -> None:
+        # метод удаляет все символы, неявляющиеся цифрами. для удаления лишнего из цен
+        for dig in s:  # проходит циклом по строке цены
+            if not dig.isdigit():  # если не цифра
+                s = s.replace(dig, '')  # заменяет символ 
+
+        n = 1
+        # добавление пробелов в тысячах
+        for d in range(len(s))[::-1]:
+            if n == 3:
+                s = s[:d] + ' ' + s[d:]
+                n = 0
+            else:
+                n += 1
+                continue
+       
+        return s + ' ₽'
+
+
     def links_generator(self, find_links: list[str]) -> Generator:
         '''Метод создает генератор ссылок на карточки товара
         функция избавляется от дублей ссылок и в тоже время сохраняет порядок.
@@ -72,7 +91,7 @@ class Ozon():
             '''словарь пронумерованных ссылок. для того чтобы избавиться от дублей ссылок используется 
             фунция list_generator из functions.py которая просто берет ссылки через одну.
             вообще дубли ссылок появляются из-за того что ссылка есть на картинке и на наименовании товара'''
-            result_urls = {
+            result_links = {
                 j: k for j, k in enumerate(
                     (f'{link.get_attribute("href")}' for link in self.links_generator(find_links))
                 )
@@ -80,12 +99,12 @@ class Ozon():
             
             # запись в файл json, название которого состоит из имени ресурса, даты и времени парсинга
             with open(
-                f'{datetime.strftime(datetime.now(), "./ozon_links/ozon_links_d%d%m%y_t%H%M%S.json")}', 'w', encoding='utf-8'
+                f'{datetime.strftime(datetime.now(), "./ozon_data/links/ozon_links_d%d%m%y_t%H%M%S.json")}', 'w', encoding='utf-8'
                 ) as file:
-                json.dump(result_urls, file, indent=4, ensure_ascii=False)
+                json.dump(result_links, file, indent=4, ensure_ascii=False)
 
             print("[+] Ссылки на товары добавлены")  # сообщение о удачном сборе ссылок карточек
-            return result_urls
+            return result_links
         except:
             print("[!] По дороге что-то сломалось.")  # если что-то пошло не так   
 
@@ -142,12 +161,12 @@ class Ozon():
         product_data = {
             'product_id': product_id,
             'product_name': product_name,
-            'product_stat': product_stat,
+            #'product_stat': product_stat, 
             'product_stars': product_stars,
             'product_reviews': product_reviews, 
-            'product_card_price': product_card_price,
-            'product_discount_price': product_discount_price, 
-            'product_full_price': product_full_price
+            'product_card_price': self.del_to_not_dig(product_card_price),  # добалено удаление лишних символов из цены
+            'product_discount_price': self.del_to_not_dig(product_discount_price), 
+            'product_full_price': self.del_to_not_dig(product_full_price)
         }
 
         self.driver.close()  # закрывает окно карточки товара    
@@ -165,8 +184,12 @@ class Ozon():
     def go_bypassing(self) -> None:
         '''При первом гет запросе включается защита от бота.
         Этот метод нажимает на вылезающую кнопку обновить и открывается главную страницу озон'''
-        self.driver.find_element(By.ID, 'reload-button').click()  # определение кнопки "Обновить" и клик на нее
-        time.sleep(self.timing)  # пауза после обновления страницы
+        try:
+            self.driver.find_element(By.ID, 'reload-button').click()  # определение кнопки "Обновить" и клик на нее
+            time.sleep(self.timing)  # пауза после обновления страницы
+        except:
+            time.sleep(self.timing)
+            self.go_bypassing()
 
 
     def go_select_locatiion(self) -> dict:
@@ -209,6 +232,7 @@ class Ozon():
 
 
     def go_product_datas(self) -> None:
+        # записывает данные собранные со всех карточек товаров
         products_data: list = []
 
         # проходит циклом по словарю ссылок
@@ -224,17 +248,17 @@ class Ozon():
 
                 # записывает полученные данные в результурющий json
         with open(
-            datetime.strftime(datetime.now(), "./ozon_datas/OZON_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
+            datetime.strftime(datetime.now(), "./ozon_data/cards_data/OZON_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
             ) as file:
             json.dump(products_data, file, indent=4, ensure_ascii=False)
 
 
-
 # класс парсера wb
 class Wildberries():
+    # словарь ключей для сортировки товаров по признаку
     sign_sorting: dict = {
-            'price_l': '&sort=priceup',  # по возрастанию цены
-            'price_h': '&sort=pricedown',  # по убыванию цены
+            'pl': '&sort=priceup',  # по возрастанию цены
+            'ph': '&sort=pricedown',  # по убыванию цены
             'new': '&sort=newly',  # по новизне
             'sale': '&sort=benefit',  # по распродажам
             'rate': '&sort=rate'  # по рейтингу
@@ -250,10 +274,18 @@ class Wildberries():
         self.count_cards = count_cards  # количество проходимых карточек товаров
 
 
+    def _get_to_main_page(self) -> None:
+        '''Функция гет запрос на страницу, с внесенесенными данными по поиску и сортировке товаро на страницы, в саму ссылку.
+        Пока это работает и естественно намного быстрее ручного ввода в строку поиск.'''
+        self.url = f"https://www.wildberries.ru/catalog/0/search.aspx?{self.sign.lstrip('&')}&search={self.item_name}"  # измененый юрл WB
+        self.driver.get(self.url)  # гет на этот юрл
+        time.sleep(self.timing)  # ожидание 
+
+
     def page_down(self) -> None:
         '''JS функция скроллинга страницы '''
         self.driver.execute_script('''
-                                const scrollStep = 200; // Размер шага прокрутки (в пикселях)
+                                const scrollStep = 20; // Размер шага прокрутки (в пикселях)
                                 const scrollInterval = 100; // Интервал между шагами (в миллисекундах)
 
                                 const scrollHeight = document.documentElement.scrollHeight;
@@ -278,9 +310,10 @@ class Wildberries():
     def go_search(self) -> None:
         '''Метод вводит в поисковую строку ВБ нужное наименование товара и начинает поиск.'''
         find_input = self.driver.find_element(By.ID, 'searchInput')  # находит строку поиска
-        find_input.clear()  # на всякий случай строка для поиска очищается
+       # find_input.clear()  # на всякий случай строка для поиска очищается
+        # time.sleep(0.5)
         find_input.send_keys(self.item_name)  # вводит в строку поиска наш запрос
-        time.sleep(0.5)  # небольшое ожидание после ввода
+        time.sleep(self.timing)  # небольшое ожидание после ввода
 
         find_input.send_keys(Keys.ENTER)  # жмет энтер
         time.sleep(self.timing)  # ожидание после начала поиска
@@ -295,58 +328,150 @@ class Wildberries():
 
 
     def _go_scroll(self) -> None:
-        '''Скролинг страницы. Пока не используется.'''
-        self.page_down(self.driver)  # вызывает функцию скролинга страницы
+        '''Скролинг страницы. Используется для открытия полного кода страницы.'''
+        self.page_down()  # вызывает функцию скролинга страницы
         time.sleep(self.timing)  # ожидание после вызова функции скролинга
 
 
     def searcher_links(self) -> dict[int: str] | None:
         '''Метод поиска ссылок на страницы товаров. Находит ссылки и записывает в json файл. После возвращает словарь, для прохода по карточкам товара'''
-        #try:
-        time.sleep(3)
-        find_links = self.driver.find_elements(By.TAG_NAME, 'draggable') # поиск по тегу
-        print(find_links)
+        
+        try:
+            self._go_scroll()  # немного скрол виниз, для открытия страницы
+            time.sleep(self.timing)  # ожидание после прокрутки
 
-        '''словарь пронумерованных ссылок. для того чтобы избавиться от дублей ссылок используется 
-            фунция list_generator из functions.py которая просто берет ссылки через одну.
-            вообще дубли ссылок появляются из-за того что ссылка есть на картинке и на наименовании товара
-            result_urls = {
-                j: k for j, k in enumerate(
-                    (f'{link.get_attribute("href")}' for link in self.links_generator(find_links))
-                )
-            }
-            
-            # запись в файл json, название которого состоит из имени ресурса, даты и времени парсинга
-            with open(
-                f'{datetime.strftime(datetime.now(), "./ozon_links/ozon_links_d%d%m%y_t%H%M%S.json")}', 'w', encoding='utf-8'
-                ) as file:
-                json.dump(result_urls, file, indent=4, ensure_ascii=False)
+            soup = BeautifulSoup(self.driver.page_source, 'lxml')  # создание супа страницы с товарами
 
-            print("[+] Ссылки на товары добавлены")  # сообщение о удачном сборе ссылок карточек
-            return result_urls
-        except:
-            print("[!] По дороге что-то сломалось.")  # если что-то пошло не так   '''
+            links_dict: dict[int: str] = {} # словарь под ссылки на товары
 
+            # проходится циклам по всем совпадениям с нумерацией
+            for n, tag in enumerate(soup.find_all('a', class_='product-card__link j-card-link j-open-full-product-card')):
+                links_dict[n] = tag.get('href')  # записывает в словарь по ключу - номер ссылки
+
+            # открывает json файл для записи    
+            with open(f'{datetime.strftime(datetime.now(), "./wb_data/links/wb_links_d%d%m%y_t%H%M%S.json")}',
+                    'w', encoding='utf-8') as file:
+                json.dump(links_dict, file, indent=4, ensure_ascii=False)
+
+            print(f'[INFO] Добавлено {n + 1} ссылок.')
+            return links_dict  # возваращает словарь со ссылками на карточки товаров
+        except Exception as err:
+            print(f'[ERROR] Возникла ошибка {err}')
+
+    
+    def del_to_not_dig(self, s: str) -> None:
+        # метод удаляет все символы, неявляющиеся цифрами. для удаления лишнего из цен
+        for dig in s:  # проходит циклом по строке цены
+            if not dig.isdigit():  # если не цифра
+                s = s.replace(dig, '')  # заменяет символ 
+
+        n = 1
+        # добавление пробелов в тысячах
+        for d in range(len(s))[::-1]:
+            if n == 3:
+                s = s[:d] + ' ' + s[d:]
+                n = 0
+            else:
+                n += 1
+                continue
+       
+        return s + ' ₽'
+
+
+    def product_data_pars(self, url: str) -> dict[str, str]:
+        '''Метод открывает карточку товара в новой вкладке собирает информацию о товаре из карточкию.
+        На вход принимает url карточки товара.'''
+        self.driver.switch_to.new_window('tab')  # открывает новую вкладку 
+        self.driver.get(url)  # гет на юрл карточки товара
+        self._go_scroll()  # скролинг для открытия html кода
+        time.sleep(self.timing)  # немного подождать
+
+        page = str(self.driver.page_source)  # сохраняет страницу
+        soup = BeautifulSoup(page, 'lxml')  # создает суп
+
+        # цикл ожидания пока не появятся все нужные теги
+        while not soup.find(
+                'span', class_='price-block__price'
+            ):
+            time.sleep(0.5)
+            page = str(self.driver.page_source)  # сохраняет страницу
+            soup = BeautifulSoup(page, 'lxml')  # создает суп
+
+        product_id = soup.find('span', id='productNmId').text.strip()  # находит артикул товара
+
+        product_name = soup.find('h1', class_='product-page__title').text.strip()  # находит наименование товара
+
+        try:
+            # находит количество звезд у товара
+            product_stars = soup.find('p', class_='product-page__reviews-icon address-rate-mini address-rate-mini--sm').text.strip()
+            product_reviews = soup.find('p', class_='product-page__reviews-text').text.strip()  # находит количество оценок у товара
+        except:  # если ошибка то Ноны
+            product_stars = None
+            product_reviews = None
+
+        # находит цену по карте wb и со скидкой без карты, в одну строку
+        try:
+            # находит часть когда в котором цены и забирает от туда текс, в котором одновременно обе цены и создает список разделителем ₽
+            prices = soup.find(
+                'span', class_='price-block__price'
+            ).text.strip().split('₽')
+
+            # первая цена это цена по карте
+            product_discount_price = self.del_to_not_dig(prices[0].strip())
+
+            if prices[1]:  # если есть вторая цена, тогда присваивает ее переменной цены со скидкой
+                product_card_price = self.del_to_not_dig(prices[0].strip())
+                product_discount_price = self.del_to_not_dig(prices[1].strip())
+            else:  # если второй нет, то цена скидкой нан
+                product_discount_price = None
+        except Exception as err:
+            # если исключение врзникает, значит такой тег не найден, и значит цен со скидками нет None
+            product_card_price = None
+            product_discount_price = None
+            print(f'[ERROR] Похоже что цена только без скидки...{err}')
+
+        # находит полную цену без скидки
+        product_full_price = self.del_to_not_dig(soup.find('del', class_='price-block__old-price').text.strip())
+
+        # словарь со всеми собранными данными
+        product_data = {
+            'product_id': product_id,
+            'product_name': product_name,
+            'product_stars': product_stars,
+            'product_reviews': product_reviews, 
+            'product_card_price': product_card_price,
+            'product_discount_price': product_discount_price, 
+            'product_full_price': product_full_price
+        }
+
+        self.driver.close()  # закрывает окно карточки товара    
+        self.driver.switch_to.window(self.driver.window_handles[0])  # переходит на дефолтную страницу
+
+        print(product_data)
+
+        return product_data
 
 
     def go_product_datas(self) -> None:
-        products_data: list = []
+        # записывает данные собранные со всех карточек товаров
+        products_data: list = []  # список под словари с данными с карточек товаров
 
         # проходит циклом по словарю ссылок
         for n, url in self.searcher_links().items():
             try:  # если ошибок нет
                 data: dict = self.product_data_pars(url=url)  # собирает данные с карточки товара в словарь
-                print(f"[+] С ссылки №{n} данные успешно собраны.")  # принутет что все норм
+                print(f"[INFO] С ссылки №{n} данные успешно собраны.")  # принутет что все норм
                 products_data.append(data)  # и запись в общую коллекцию
             except Exception as err:  # если что-то пошло не так, сообщает об этом
-                print(f'[-] При работе с ссылкой №{n} возникла ошибка {err}.')
+                print(f'[ERROR] При работе с ссылкой №{n} возникла ошибка {err}.')
             if n == self.count_cards:  # для теста ограничение на проход только по 3-м ссылкам
                 break
 
                 # записывает полученные данные в результурющий json
         with open(
-            datetime.strftime(datetime.now(), "./ozon_datas/OZON_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
+            datetime.strftime(datetime.now(), "./wb_data/cards_data/WB_PRODUCT_DATA_d%d%m%y--t%H-%M-%S.json"), 'w', encoding="utf-8"
             ) as file:
             json.dump(products_data, file, indent=4, ensure_ascii=False)
+
 
 
